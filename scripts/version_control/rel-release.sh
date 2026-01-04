@@ -42,13 +42,23 @@ rel_minor() {
   rel_ctx_load_open_milestone
   rel_ctx_load_last_tag
 
-  local tag="v${REL_MAJOR}.$((REL_MINOR + 1)).0"
-  local notes="See project ${REL_PROJ_TITLE} for details."
-  rel_create_release "$tag" "$notes"
+  # release minor
+  local tag_release="v${REL_MAJOR}.$((REL_MINOR + 1)).0"
+  local notes="See project ${tag_release} for details."
+
+  # (novo) renomeia o project atual pra bater com a tag
+  # (usa a variável do project carregado no ctx; aqui assumo REL_PROJ é o number)
+  gh project edit "$REL_PROJ" --owner "$REL_OWNER" --title "$tag_release" >/dev/null
+  REL_PROJ_TITLE="$tag_release"
+
+  rel_create_release "$tag_release" "$notes"
 
   rel_mark_all_done "$REL_PROJ"
   rel_close_project
-  rel_maybe_open_next_project "$tag"
+
+  # (novo) próximo project = patch+1 do milestone recém lançado
+  local next_project="v${REL_MAJOR}.$((REL_MINOR + 1)).1"
+  rel_maybe_open_next_project "$next_project"
 }
 
 rel_major() {
@@ -59,11 +69,20 @@ rel_major() {
   rel_ctx_load_open_milestone
   rel_ctx_load_last_tag
 
-  local tag="v$((REL_MAJOR + 1)).0.0"
-  local notes="See project ${REL_PROJ_TITLE} for details."
-  rel_create_release "$tag" "$notes"
+  # release major
+  local tag_release="v$((REL_MAJOR + 1)).0.0"
+  local notes="See project ${tag_release} for details."
+
+  # (novo) renomeia o project atual pra bater com a tag
+  gh project edit "$REL_PROJ" --owner "$REL_OWNER" --title "$tag_release" >/dev/null
+  REL_PROJ_TITLE="$tag_release"
+
+  rel_create_release "$tag_release" "$notes"
 
   rel_mark_all_done "$REL_PROJ"
   rel_close_project
-  rel_maybe_open_next_project "$tag"
+
+  # (novo) próximo project = patch+1 do major recém lançado
+  local next_project="v$((REL_MAJOR + 1)).0.1"
+  rel_maybe_open_next_project "$next_project"
 }
