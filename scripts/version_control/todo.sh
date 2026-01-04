@@ -4,6 +4,7 @@ todo() {
   local owner
   owner="$(gh repo view --json owner -q .owner.login)"
 
+  # milestone atual: primeiro project ABERTO cujo título parece vX.Y.Z
   local proj
   proj="$(
     gh project list --owner "$owner" --format json |
@@ -24,17 +25,27 @@ todo() {
   local title
   title="$(gh project view "$proj" --owner "$owner" --format json | jq -r '.title')"
 
-  echo "📌 Project aberto: $title (#$proj)"
+  echo "📌 Milestone (Project) aberto: $title (#$proj)"
+  echo "   Patch: rel p #<issue>   | Minor: rel m   | Major: rel M"
   echo
 
   gh project item-list "$proj" --owner "$owner" --format json |
     jq -r '
+      def ititle($i): ($i.title // $i.content.title // "Untitled");
+      def inum($i):
+        if ($i.content.number? != null) then
+          ("#" + ($i.content.number|tostring))
+        else
+          "#?"
+        end;
+      def istatus($i): ($i.status // "No status");
+
       .items
       | if (length==0) then
           "   (sem itens)"
         else
           .[]
-          | ("- [" + (.status // "No status") + "] " + (.title // .content.title // "Untitled"))
+          | ("- [" + istatus(.) + "] " + inum(.) + "  " + ititle(.))
         end
     '
 }
