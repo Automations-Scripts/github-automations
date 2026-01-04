@@ -41,6 +41,30 @@ rel() {
 
   proj_title="$(gh project view "$proj" --owner "$owner" --format json | jq -r '.title')"
 
+
+  # ---- DEBUG: fonte da verdade no GitHub (tags) ----
+  echo "[debug] repo: $owner/$repo"
+
+  local gh_last
+  gh_last="$(
+    gh api "repos/$owner/$repo/tags" --paginate -q '.[].name' |
+      grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' |
+      sort -V |
+      tail -n 1
+  )"
+
+  echo "[debug] last tag from GitHub tags API: ${gh_last:-<empty>}"
+
+  if [ -z "${gh_last:-}" ]; then
+    gh_last="v0.0.0"
+  fi
+
+  local base="${gh_last#v}"
+  local major minor patch
+  IFS='.' read -r major minor patch <<< "$base"
+
+  echo "[debug] parsed semver: major=$major minor=$minor patch=$patch"
+
   # ----------------------------
   # Última tag (semver)
   # ----------------------------
@@ -67,8 +91,9 @@ rel() {
   _try_set_status() {
     local project_number="$1"
     local item_id="$2"
-    local status="$3"
-    gh project item-edit "$project_number" --owner "$owner" --id "$item_id" --status "$status" >/dev/null 2>&1 || true
+    local new_status="$3"
+
+    gh project item-edit "$project_number" --owner "$owner" --id "$item_id" --status "$new_status" >/dev/null 2>&1 || true
   }
 
   _mark_all_done() {
@@ -90,6 +115,7 @@ rel() {
   _create_release() {
     local tag="$1"
     local notes="$2"
+    echo "[debug] confirm tag to create: $tag"
     gh release create "$tag" --title "$tag" --notes "$notes"
     echo "✅ Release criada: $tag"
   }
