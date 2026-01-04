@@ -4,7 +4,6 @@ todo() {
   local owner
   owner="$(gh repo view --json owner -q .owner.login)"
 
-  # pega o primeiro project ABERTO cujo título parece "v1.2.3"
   local proj
   proj="$(
     gh project list --owner "$owner" --format json |
@@ -23,42 +22,19 @@ todo() {
   fi
 
   local title
-  title="$(
-    gh project view "$proj" --owner "$owner" --format json |
-      jq -r '.title'
-  )"
+  title="$(gh project view "$proj" --owner "$owner" --format json | jq -r '.title')"
 
   echo "📌 Project aberto: $title (#$proj)"
   echo
 
-  # tenta achar field Status pra mostrar em cada item (se existir)
-  local status_field_id
-  status_field_id="$(
-    gh project field-list "$proj" --owner "$owner" --format json |
-      jq -r '.fields[] | select(.name=="Status") | .id' | head -n1 || true
-  )"
-
-  # lista itens
-    gh project item-list "$proj" --owner "$owner" --format json |
-    jq -r --arg STATUS_ID "${status_field_id:-}" '
-        def statusOf($item):
-        if ($STATUS_ID|length) == 0 then
-            ""
+  gh project item-list "$proj" --owner "$owner" --format json |
+    jq -r '
+      .items
+      | if (length==0) then
+          "   (sem itens)"
         else
-            (
-            ($item.fieldValues // [])
-            | map(select(.field.id? == $STATUS_ID))
-            | .[0].name? // .[0].value? // ""
-            )
-        end;
-
-        .items
-        | if (length==0) then
-            "   (sem itens)"
-        else
-            .[]
-            | ("- " + (statusOf(.) | if .=="" then "" else "["+.+"] " end)
-            + (.title // .content.title // "Untitled"))
+          .[]
+          | ("- [" + (.status // "No status") + "] " + (.title // .content.title // "Untitled"))
         end
     '
 }
