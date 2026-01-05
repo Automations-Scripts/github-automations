@@ -1,12 +1,32 @@
 rel() {
   emulate -L zsh
-  set -uo pipefail
+  set -euo pipefail
 
   local cmd="${1:-}"
-  local sub="${2:-}"
   shift || true
 
-  case "$cmd" in
+  case "${cmd:-}" in
+    ready)    rel_ready    "$@" ;;
+    progress) rel_progress "$@" ;;
+    done)     rel_done     "$@" ;;
+    init)     rel_init     "$@" ;;
+    p)        rel_patch    "$@" ;;
+    m)        rel_minor    "$@" ;;
+    M)        rel_major    "$@" ;;
+    *)
+      echo "Usage:"
+      echo "  rel init Item A -- Item B -- Item C"
+      echo "  rel p <issue>        (patch release)"
+      echo "  rel m                (minor release)"
+      echo "  rel M                (major release)"
+      echo "  rel ready <issue>    (set Status=Ready)"
+      echo "  rel progress <issue> (set Status=In progress)"
+      echo "  rel done <issue>     (set Status=Done)"
+      return 1
+      ;;
+  esac
+}
+
     # wipe)
     #   case "$sub" in
     #     releases)
@@ -32,20 +52,3 @@ rel() {
     #   esac
     #   return 0
     #   ;;
-    ready)     shift; rel_ready "$@" ;;
-    progress)  shift; rel_progress "$@" ;;
-    done)      shift; rel_done "$@" ;;
-    init) rel_init "$@" ;;
-    p)    rel_patch "$@" ;;
-    m)    rel_minor "$@" ;;
-    M)    rel_major "$@" ;;
-    *)
-      echo "Use:"
-      echo "  rel init Item 1 -- Item 2 -- Item 3"
-      echo "  rel p <#issue>"
-      echo "  rel m"
-      echo "  rel M"
-      return 1
-      ;;
-  esac
-}
