@@ -144,8 +144,8 @@ rel_create_release() {
   echo "[info] $REL_REPO_FULL"
   echo "[info] Tag to create: $REL_LAST_TAG -> $tag"
 
-  gh release create "$tag" --title "$tag" --notes "$notes"
-  echo "Release created: $tag"
+  gh release create "$tag" --title "$tag" --notes "$notes" > /dev/null
+  echo "[info] Release created: $tag"
 }
 
 rel_close_project() {
