@@ -139,7 +139,7 @@ rel_init() {
   # Aqui rel_init recebe os tokens dos itens diretamente (não recebe "init")
   # ----------------------------
   if [[ "$#" -ge 1 ]]; then
-    echo "Criando itens (separador: --):"
+    echo "Criando itens:"
 
     local sep="--"
     local parts=()
@@ -176,6 +176,7 @@ rel_init() {
       fi
 
       gh project item-add "$target_proj" --owner "$owner" --url "$issue_url" >/dev/null
+
       echo "  • criado: $t"
     done
   else

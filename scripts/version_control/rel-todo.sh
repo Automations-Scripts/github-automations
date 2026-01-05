@@ -25,7 +25,7 @@ todo() {
   local title
   title="$(gh project view "$proj" --owner "$owner" --format json | jq -r '.title')"
 
-  echo "📌 Milestone (Project) aberto: $title (#$proj)"
+  echo "Milestone (Project) aberto: $title (#$proj)"
   echo "   Patch: rel p #<issue>   | Minor: rel m   | Major: rel M"
   echo
 
