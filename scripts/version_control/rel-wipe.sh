@@ -2,18 +2,18 @@ rel_wipe_project() {
   emulate -L zsh
   set -euo pipefail
 
-  # Repo atual
+  # Current repository
   local repo_full owner repo owner_type
   repo_full="$(gh repo view --json owner,name -q '.owner.login + "/" + .name')"
   owner="${repo_full%%/*}"
   repo="${repo_full##*/}"
 
   echo
-  echo "🔎 Repositório alvo:"
+  echo " Target repository:"
   echo "   $repo_full"
   echo
 
-  # Tipo do owner (User | Organization)
+  # Owner type (User | Organization)
   owner_type="$(gh api "repos/$repo_full" -q '.owner.type')"
   echo "Owner type: $owner_type"
   echo
@@ -71,37 +71,37 @@ rel_wipe_project() {
   fi
 
   if [[ -z "${projects:-}" ]]; then
-    echo "✅ Nenhum Project associado a este repositório."
+    echo " No Projects associated with this repository."
     return 0
   fi
 
-  echo "📋 Projects associados a $repo_full:"
+  echo " Projects associated with $repo_full:"
   echo
-    echo "$projects" | jq -r '
+  echo "$projects" | jq -r '
     "• #\(.number)\t\(.title)\t(repos: \((.repositories.nodes | map(.nameWithOwner) | join(","))))"
-    '
+  '
   echo
 
-  echo "⚠️  ATENÇÃO: estes Projects serão APAGADOS DEFINITIVAMENTE."
-  echo -n "Digite exatamente DELETE para confirmar: "
+  echo "  WARNING: these Projects will be PERMANENTLY DELETED."
+  echo -n "Type exactly DELETE to confirm: "
   local confirm
   read -r confirm
 
   if [[ "$confirm" != "DELETE" ]]; then
-    echo "❌ Cancelado. Nenhum project foi removido."
+    echo " Cancelled. No projects were removed."
     return 1
   fi
 
   echo
-  echo "🔥 Apagando Projects..."
+  echo " Deleting Projects..."
 
   echo "$projects" | jq -r '.number' | while read -r n; do
-    echo "  🗑️  Deletando project #$n"
+    echo "  🗑️  Deleting project #$n"
     gh project delete "$n" --owner "$owner"
   done
 
   echo
-  echo "✅ Limpeza concluída."
+  echo " Cleanup completed."
 }
 
 rel_wipe_releases() {
@@ -112,8 +112,8 @@ rel_wipe_releases() {
   repo_full="$(gh repo view --json owner,name -q '.owner.login + "/" + .name')"
 
   echo
-  echo "🔎 Repo: $repo_full"
-  echo "📦 Listando releases..."
+  echo " Repo: $repo_full"
+  echo " Listing releases..."
   echo
 
   local rels
@@ -121,28 +121,28 @@ rel_wipe_releases() {
     | jq -c '.[]')"
 
   if [[ -z "${rels:-}" ]]; then
-    echo "✅ Nenhuma release encontrada."
+    echo " No releases found."
     return 0
   fi
 
-  echo "📋 Releases encontradas:"
+  echo " Releases found:"
   echo "$rels" | jq -r '"• \(.tagName)\t\(.name // "-")\t\(.createdAt)"'
   echo
 
-  echo -n "⚠️  Digite DELETE-RELEASES para apagar TODAS: "
+  echo -n "  Type DELETE-RELEASES to delete ALL releases: "
   local confirm
   read -r confirm
-  [[ "$confirm" == "DELETE-RELEASES" ]] || { echo "❌ Cancelado."; return 1; }
+  [[ "$confirm" == "DELETE-RELEASES" ]] || { echo "❌ Cancelled."; return 1; }
 
   echo
-  echo "🔥 Apagando releases..."
+  echo " Deleting releases..."
   echo "$rels" | jq -r '.tagName' | while read -r tag; do
     [[ -z "$tag" ]] && continue
-    echo "  🗑️  release $tag"
+    echo "    release $tag"
     gh release delete "$tag" --repo "$repo_full" -y
   done
 
-  echo "✅ Releases apagadas."
+  echo " Releases deleted."
 }
 
 rel_wipe_tags() {
@@ -153,8 +153,8 @@ rel_wipe_tags() {
   repo_full="$(gh repo view --json owner,name -q '.owner.login + "/" + .name')"
 
   echo
-  echo "🔎 Repo: $repo_full"
-  echo "🏷️  Listando tags remotas..."
+  echo " Repo: $repo_full"
+  echo "  Listing remote tags..."
   echo
 
   local tags
@@ -162,28 +162,28 @@ rel_wipe_tags() {
     | jq -r '.[].ref | sub("^refs/tags/";"")')"
 
   if [[ -z "${tags:-}" ]]; then
-    echo "✅ Nenhuma tag encontrada."
+    echo " No tags found."
     return 0
   fi
 
-  echo "📋 Tags encontradas:"
+  echo " Tags found:"
   echo "$tags" | sed 's/^/• /'
   echo
 
-  echo -n "⚠️  Digite DELETE-TAGS para apagar TODAS: "
+  echo -n "  Type DELETE-TAGS to delete ALL tags: "
   local confirm
   read -r confirm
-  [[ "$confirm" == "DELETE-TAGS" ]] || { echo "❌ Cancelado."; return 1; }
+  [[ "$confirm" == "DELETE-TAGS" ]] || { echo " Cancelled."; return 1; }
 
   echo
-  echo "🔥 Apagando tags..."
+  echo " Deleting tags..."
   echo "$tags" | while read -r t; do
     [[ -z "$t" ]] && continue
-    echo "  🗑️  tag $t"
+    echo "    tag $t"
     gh api -X DELETE "repos/$repo_full/git/refs/tags/$t" >/dev/null
   done
 
-  echo "✅ Tags apagadas."
+  echo " Tags deleted."
 }
 
 rel_wipe_all() {
@@ -194,14 +194,14 @@ rel_wipe_all() {
   repo_full="$(gh repo view --json owner,name -q '.owner.login + "/" + .name')"
 
   echo
-  echo "☢️  WIPE TOTAL (releases + tags)"
+  echo "  TOTAL WIPE (releases + tags)"
   echo "Repo: $repo_full"
   echo
 
-  echo -n "Digite exatamente NUKE para continuar: "
+  echo -n "Type exactly NUKE to continue: "
   local c
   read -r c
-  [[ "$c" == "NUKE" ]] || { echo "❌ Cancelado."; return 1; }
+  [[ "$c" == "NUKE" ]] || { echo " Cancelled."; return 1; }
 
   rel_wipe_releases
   rel_wipe_tags
