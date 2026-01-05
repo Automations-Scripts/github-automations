@@ -1,6 +1,3 @@
-# rel-lib.zsh
-# Shared helpers for rel_patch / rel_minor / rel_major
-
 rel_ctx_load_repo() {
   emulate -L zsh
   set -euo pipefail

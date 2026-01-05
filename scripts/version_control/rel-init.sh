@@ -112,7 +112,7 @@ rel_init() {
   if [[ -n "${open_proj:-}" ]]; then
     target_proj="$open_proj"
     target_title="$open_title"
-    echo "📌 Open dev line found: $target_title (#$target_proj)"
+    echo " Open dev line found: $target_title (#$target_proj)"
   else
     if [[ -n "${last_title:-}" ]]; then
       # last_title is like vX.Y.x -> next is vX.(Y+1).x
