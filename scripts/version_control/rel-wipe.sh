@@ -77,9 +77,9 @@ rel_wipe() {
 
   echo "📋 Projects associados a $repo_full:"
   echo
-  echo "$projects" | jq -r '
-    "• #\(.number)\t\(.title)\t(repos: \(.repositories.nodes[].nameWithOwner | join(",")))"
-  '
+    echo "$projects" | jq -r '
+    "• #\(.number)\t\(.title)\t(repos: \((.repositories.nodes | map(.nameWithOwner) | join(","))))"
+    '
   echo
 
   echo "⚠️  ATENÇÃO: estes Projects serão APAGADOS DEFINITIVAMENTE."
