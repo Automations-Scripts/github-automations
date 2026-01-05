@@ -1,11 +1,37 @@
 rel() {
+  emulate -L zsh
   set -uo pipefail
 
   local cmd="${1:-}"
+  local sub="${2:-}"
   shift || true
 
   case "$cmd" in
-    wipe) rel_wipe "$@" ;;
+    wipe)
+      case "$sub" in
+        releases)
+          rel_wipe_releases
+          ;;
+        tags)
+          rel_wipe_tags
+          ;;
+        all)
+          rel_wipe_all
+          ;;
+        project)
+          rel_wipe_project
+          ;;
+        *)
+          echo "Uso:"
+          echo "  rel wipe project"
+          echo "  rel wipe releases"
+          echo "  rel wipe tags"
+          echo "  rel wipe all"
+          return 1
+          ;;
+      esac
+      return 0
+      ;;
     init) rel_init "$@" ;;
     p)    rel_patch "$@" ;;
     m)    rel_minor "$@" ;;

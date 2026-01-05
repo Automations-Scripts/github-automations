@@ -61,13 +61,56 @@ rel_items_json() {
   gh project item-list "$REL_PROJ" --owner "$REL_OWNER" --format json
 }
 
+# rel_try_set_status() {
+#   emulate -L zsh
+#   set -euo pipefail
+#   local project_number="$1" item_id="$2" new_status="$3"
+
+#   # best-effort
+#   gh project item-edit "$project_number" --owner "$REL_OWNER" --id "$item_id" --status "$new_status" >/dev/null 2>&1 || true
+# }
+
 rel_try_set_status() {
   emulate -L zsh
   set -euo pipefail
-  local project_number="$1" item_id="$2" new_status="$3"
 
-  # best-effort
-  gh project item-edit "$project_number" --owner "$REL_OWNER" --id "$item_id" --status "$new_status" >/dev/null 2>&1 || true
+  local project_number="$1"
+  local item_id="$2"
+  local new_status="$3"   # NUNCA chame de "status" no zsh
+
+  # 1) Tenta o caminho curto (se o seu gh suportar)
+  if gh project item-edit "$project_number" --owner "$REL_OWNER" --id "$item_id" --status "$new_status" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  # 2) Fallback robusto: usa field-id + option-id do Status
+  local fields_json status_field_id option_id
+  fields_json="$(gh project field-list "$project_number" --owner "$REL_OWNER" --format json 2>/dev/null || true)"
+
+  status_field_id="$(echo "$fields_json" | jq -r '
+    .fields[]? | select(.name=="Status") | .id
+  ' | head -n1)"
+
+  if [[ -z "${status_field_id:-}" || "$status_field_id" == "null" ]]; then
+    # não achou o field "Status" via CLI -> não dá pra setar por esse caminho
+    return 0
+  fi
+
+  option_id="$(echo "$fields_json" | jq -r --arg S "$new_status" '
+    .fields[]? | select(.id=="'"$status_field_id"'")
+    | .options[]? | select(.name==$S) | .id
+  ' | head -n1)"
+
+  if [[ -z "${option_id:-}" || "$option_id" == "null" ]]; then
+    return 0
+  fi
+
+  gh project item-edit "$project_number" \
+    --owner "$REL_OWNER" \
+    --id "$item_id" \
+    --field-id "$status_field_id" \
+    --single-select-option-id "$option_id" \
+    >/dev/null 2>&1 || true
 }
 
 rel_mark_all_done() {
