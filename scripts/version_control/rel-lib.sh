@@ -180,3 +180,31 @@ rel_maybe_open_next_project() {
       ;;
   esac
 }
+
+rel_create_tag() {
+  emulate -L zsh
+  set -euo pipefail
+
+  local tag="$1"
+
+  echo "[info] $REL_REPO_FULL"
+  echo "[info] Tag to create: $REL_LAST_TAG -> $tag"
+
+  # If tag already exists, stop (avoid rewriting history)
+  if gh api "repos/$REL_REPO_FULL/git/ref/tags/$tag" >/dev/null 2>&1; then
+    echo "[warn] Tag already exists: $tag"
+    return 1
+  fi
+
+  # Tag target = default branch HEAD (source of truth on GitHub)
+  local default_branch sha
+  default_branch="$(gh api "repos/$REL_REPO_FULL" -q '.default_branch')"
+  sha="$(gh api "repos/$REL_REPO_FULL/git/ref/heads/$default_branch" -q '.object.sha')"
+
+  gh api -X POST "repos/$REL_REPO_FULL/git/refs" \
+    -f "ref=refs/tags/$tag" \
+    -f "sha=$sha" \
+    >/dev/null
+
+  echo "[info] Tag created: $tag (at $default_branch@$sha)"
+}

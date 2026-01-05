@@ -13,12 +13,12 @@ rel_patch() {
   [[ "$issue_no" =~ ^[0-9]+$ ]] || { echo "Invalid issue number: $ref"; return 1; }
 
   local tag="v${REL_MAJOR}.${REL_MINOR}.$((REL_PATCH + 1))"
-  local next_minor="$((REL_MINOR + 1))"
-  local notes="See item #${issue_no} of project v${REL_MAJOR}.${next_minor} for details."
-  rel_create_release "$tag" "$notes"
+
+  # Tag-only patch (no GitHub Release)
+  rel_create_tag "$tag"
 
   # Locate the corresponding project item (by issue number)
-  # and mark it as Done after the patch release.
+  # and mark it as Done after tagging.
   local json item_id
   json="$(rel_items_json)"
   item_id="$(echo "$json" | jq -r --argjson N "$issue_no" '
@@ -35,7 +35,8 @@ rel_patch() {
     fi
   fi
 
-  rel_issue_comment "$issue_no" "Released in $tag"
+  # The “traceability” now lives here (since patch is tag-only)
+  rel_issue_comment "$issue_no" "Tagged in $tag."
 }
 
 rel_minor() {
