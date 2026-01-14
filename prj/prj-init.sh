@@ -1,6 +1,7 @@
 rel_init() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   # ----------------------------
   # Repo context
@@ -132,7 +133,8 @@ rel_init() {
 # Helper used by rel_init: create issues and add them to the project
 _rel_init__create_items() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   local repo_full="$1"
   local owner="$2"
@@ -190,9 +192,7 @@ _rel_init__create_items() {
 
     gh project item-add "$proj_no" --owner "$owner" --url "$issue_url" >/dev/null
 
-    issue_no="${issue_url##*/}"
-    rel_set_item_status "#$issue_no" "Todo"
-    
+    issue_no="${issue_url##*/}"    
     echo "  • created: $t"
   done
 }

@@ -1,6 +1,7 @@
 rel_set_item_status() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   local ref="$1"
   local new_status="$2"

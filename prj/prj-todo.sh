@@ -1,6 +1,7 @@
 todo() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   local owner repo repo_full owner_type
   owner="$(gh repo view --json owner -q .owner.login)"
@@ -104,13 +105,11 @@ todo() {
         if $COLOR != 1 then
           istatus($i)
         elif s($i) == "done" then
-          "\u001b[31m" + istatus($i) + "\u001b[0m"   # vermelho
-        elif s($i) == "ready" then
-          "\u001b[32m" + istatus($i) + "\u001b[0m"   # verde
+          "\u001b[35m" + istatus($i) + "\u001b[0m"     # roxo 
         elif s($i) == "in progress" then
-          "\u001b[33m" + istatus($i) + "\u001b[0m"   # amarelo
+          "\u001b[33m" + istatus($i) + "\u001b[0m"     # amarelo
         elif s($i) == "todo" then
-          "\u001b[34m" + istatus($i) + "\u001b[0m"   # azul
+          "\u001b[32m" + istatus($i) + "\u001b[0m"   # verde
         else
           istatus($i)
         end;

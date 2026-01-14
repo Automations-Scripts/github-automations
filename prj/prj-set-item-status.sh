@@ -1,6 +1,7 @@
 rel_set_item_status() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   local ref="$1"
   local new_status="$2"
@@ -45,8 +46,8 @@ rel_progress() {
   rel_set_item_status "$1" "In Progress"
 }
 
-rel_ready() {
-  rel_set_item_status "$1" "Ready"
+rel_todo() {
+  rel_set_item_status "$1" "Todo"
 }
 
 rel_done() {

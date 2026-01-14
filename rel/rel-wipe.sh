@@ -1,6 +1,7 @@
 rel_wipe_project() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   # Current repository
   local repo_full owner repo owner_type
@@ -106,7 +107,8 @@ rel_wipe_project() {
 
 rel_wipe_releases() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   local repo_full
   repo_full="$(gh repo view --json owner,name -q '.owner.login + "/" + .name')"
@@ -147,7 +149,8 @@ rel_wipe_releases() {
 
 rel_wipe_tags() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   local repo_full
   repo_full="$(gh repo view --json owner,name -q '.owner.login + "/" + .name')"
@@ -188,7 +191,8 @@ rel_wipe_tags() {
 
 rel_wipe_all() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   local repo_full
   repo_full="$(gh repo view --json owner,name -q '.owner.login + "/" + .name')"

@@ -1,12 +1,13 @@
 rel() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   local cmd="${1:-}"
   shift || true
 
   case "${cmd:-}" in
-    ready)    rel_ready    "$@" ;;
+    todo)     rel_todo     "$@" ;;
     progress) rel_progress "$@" ;;
     done)     rel_done     "$@" ;;
     init)     rel_init     "$@" ;;
@@ -19,8 +20,8 @@ rel() {
       echo "  rel p <issue>        (patch release)"
       echo "  rel m                (minor release)"
       echo "  rel M                (major release)"
-      echo "  rel ready <issue>    (set Status=Ready)"
-      echo "  rel progress <issue> (set Status=In progress)"
+      echo "  rel todo <issue>     (set Status=Todo)"
+      echo "  rel progress <issue> (set Status=In Progress)"
       echo "  rel done <issue>     (set Status=Done)"
       return 1
       ;;

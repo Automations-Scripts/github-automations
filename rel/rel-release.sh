@@ -1,6 +1,7 @@
 rel_patch() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   local ref="${1:-}"
   [[ -z "$ref" ]] && { echo "Usage: rel p #<issue> (e.g. rel p 3)"; return 1; }
@@ -39,38 +40,47 @@ rel_patch() {
   rel_issue_comment "$issue_no" "Tagged in $tag."
 }
 
+# Minor release: fecha vX.Y.x => vX.(Y+1) (released) e cria tag vX.(Y+1)
 rel_minor() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   rel_ctx_load_repo
-  rel_ctx_load_open_milestone
   rel_ctx_load_last_tag
+  rel_ctx_load_open_milestone  # precisa apontar para v${REL_MAJOR}.${REL_MINOR}.x
 
-  # Minor release
   local next_minor="$((REL_MINOR + 1))"
-  local tag_release="v${REL_MAJOR}.${next_minor}.0"
+  local tag_release="v${REL_MAJOR}.${next_minor}"
   local proj_released="v${REL_MAJOR}.${next_minor} (released)"
-  local notes="$(rel_build_release_notes_from_project "v${REL_MAJOR}.${next_minor}")"
+  local next_project="v${REL_MAJOR}.${next_minor}.x"
 
-  # (new) Rename the current project to match the released version
-  # (uses the project number loaded in the context)
+  local notes
+  notes="$(rel_build_release_notes_from_project "v${REL_MAJOR}.${next_minor}")"
+
+  # carimba o projeto aberto (vX.Y.x) como release vX.(Y+1)
   gh project edit "$REL_PROJ" --owner "$REL_OWNER" --title "$proj_released" >/dev/null
   REL_PROJ_TITLE="$proj_released"
 
+  # cria a release com TAG curta
   rel_create_release "$tag_release" "$notes"
 
-  rel_mark_all_done "$REL_PROJ"
-  rel_close_project
+  # itens DONE ficam, backlog move.
+  if rel_project_has_backlog "$REL_PROJ"; then
+    local next_project="v${REL_MAJOR}.${next_minor}.x"
+    local next_proj_no
+    next_proj_no="$(rel_open_next_project_auto "$next_project")"
 
-  # (new) Next project = patch line for the newly released minor
-  local next_project="v${REL_MAJOR}.${next_minor}.x"
-  rel_maybe_open_next_project "$next_project"
+    rel_move_backlog_to_project "$REL_PROJ" "$next_proj_no"
+  fi
+
+  rel_close_project
 }
 
 rel_major() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   rel_ctx_load_repo
   rel_ctx_load_open_milestone

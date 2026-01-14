@@ -1,6 +1,7 @@
 rel_ctx_load_repo() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   typeset -g REL_OWNER REL_REPO REL_REPO_FULL
   REL_OWNER="$(gh repo view --json owner -q .owner.login)"
@@ -13,7 +14,8 @@ rel_ctx_load_repo() {
 
 rel_project_visibility_for_repo() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   # GitHub Projects v2 usa PUBLIC|PRIVATE (caps)
   if [[ "${REL_REPO_PRIVATE:-false}" == "true" ]]; then
@@ -25,7 +27,8 @@ rel_project_visibility_for_repo() {
 
 rel_ctx_load_open_milestone() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   typeset -g REL_PROJ REL_PROJ_TITLE
 
@@ -53,34 +56,42 @@ rel_ctx_load_open_milestone() {
 
 rel_ctx_load_last_tag() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   typeset -g REL_LAST_TAG REL_MAJOR REL_MINOR REL_PATCH
 
+  # pega tags vX.Y ou vX.Y.Z
   REL_LAST_TAG="$(
     gh api "repos/$REL_REPO_FULL/tags" --paginate -q '.[].name' |
-      grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' |
+      grep -E '^v[0-9]+\.[0-9]+(\.[0-9]+)?$' |
       sort -V |
       tail -n 1 || true
   )"
-
-  [[ -z "${REL_LAST_TAG:-}" ]] && REL_LAST_TAG="v0.0.0"
+  [[ -z "${REL_LAST_TAG:-}" ]] && REL_LAST_TAG="v0.0"
 
   local base="${REL_LAST_TAG#v}"
-  IFS='.' read -r REL_MAJOR REL_MINOR REL_PATCH <<< "$base"
+  local a b c
+  IFS='.' read -r a b c <<< "$base"
+
+  REL_MAJOR="$a"
+  REL_MINOR="$b"
+  REL_PATCH="${c:-}"   # vazio quando for release vX.Y
 }
 
 # ---------- Project helpers ----------
 
 rel_items_json() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
   gh project item-list "$REL_PROJ" --owner "$REL_OWNER" --format json
 }
 
 rel_try_set_status() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   local project_number="$1"
   local item_id="$2"
@@ -126,22 +137,41 @@ rel_try_set_status() {
 
 rel_mark_all_done() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   local project_number="$1"
-  local json
-
+  local json repo_full
   json="$(gh project item-list "$project_number" --owner "$REL_OWNER" --format json)"
 
-  echo "$json" | jq -r '.items[].id' | while IFS= read -r item_id; do
+  # repo atual (pra fechar issues)
+  local owner repo
+  owner="$(gh repo view --json owner -q .owner.login)"
+  repo="$(gh repo view --json name -q .name)"
+  repo_full="$owner/$repo"
+
+  # percorre itens do project (id + issue number se existir)
+  echo "$json" | jq -r '
+    .items[]
+    | [.id, (.content.number? // empty)]
+    | @tsv
+  ' | while IFS=$'\t' read -r item_id issue_no; do
     [[ -z "$item_id" ]] && continue
+
+    # 1) Status do Project -> Done
     rel_try_set_status "$project_number" "$item_id" "Done"
+
+    # 2) Se for Issue de verdade, fecha (isso liga o "completed" ✓)
+    if [[ -n "${issue_no:-}" ]]; then
+      gh issue close "$issue_no" --repo "$repo_full" >/dev/null || true
+    fi
   done
-}
+} 
 
 rel_issue_comment() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   local issue_no="$1"
   local body="$2"
@@ -151,7 +181,8 @@ rel_issue_comment() {
 
 rel_create_release() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   local tag="$1"
   local notes="$2"
@@ -167,13 +198,17 @@ rel_close_project() {
   emulate -L zsh
   set -euo pipefail
 
-  gh project close "$REL_PROJ" --owner "$REL_OWNER"
-  echo "Project closed: ${REL_PROJ_TITLE} (#$REL_PROJ)"
+  local proj="${1:-$REL_PROJ}"
+  local title="${2:-$REL_PROJ_TITLE}"
+
+  gh project close "$proj" --owner "$REL_OWNER"
+  echo "Project closed: ${title:-"(unknown)"} (#$proj)"
 }
 
 rel_maybe_open_next_project() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   local next_title="$1"
 
@@ -206,7 +241,8 @@ rel_maybe_open_next_project() {
 
 rel_link_project_to_repo() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   local project_number="$1"
 
@@ -221,14 +257,15 @@ rel_link_project_to_repo() {
   gh api graphql -f query='
     mutation($projectId:ID!, $repoId:ID!){
       linkProjectV2ToRepository(input:{projectId:$projectId, repositoryId:$repoId}) {
-        projectV2 { id }
+        clientMutationId
       }
     }' -F projectId="$project_id" -F repoId="$repo_id" >/dev/null
 }
 
 rel_create_tag() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   local tag="$1"
 
@@ -256,7 +293,8 @@ rel_create_tag() {
 
 rel_issue_last_patch_tag() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
   local issue_no="$1"
 
@@ -272,13 +310,13 @@ rel_issue_last_patch_tag() {
 
 rel_build_release_notes_from_project() {
   emulate -L zsh
-  set -euo pipefail
+  set -u
+  set -o pipefail
 
-  local release_line="$1"  # e.g. "v0.1"
+  local release_line="$1"  # e.g. "v0.5"
   local json
   json="$(rel_items_json)"
 
-  # Build a Markdown list of items with their latest patch tag (if any)
   echo "See project ${release_line} for details."
   echo
   echo "## Shipped items"
@@ -286,6 +324,7 @@ rel_build_release_notes_from_project() {
 
   echo "$json" | jq -r '
     .items[]
+    | select(((.status // "No status") | ascii_downcase) == "done")
     | select(.content.number? != null)
     | "\(.content.number)\t\(.content.title // .title // "Untitled")"
   ' | while IFS=$'\t' read -r issue_no title; do
@@ -297,4 +336,142 @@ rel_build_release_notes_from_project() {
       echo "- #${issue_no} ${title}"
     fi
   done
+}
+
+rel_project_id() {
+  emulate -L zsh
+  set -u
+  set -o pipefail
+  local project_number="$1"
+  gh project view "$project_number" --owner "$REL_OWNER" --format json | jq -r '.id'
+}
+
+rel_finalize_done_items() {
+  emulate -L zsh
+  set -u
+  set -o pipefail
+
+  local project_number="$1"
+  local json repo_full
+  json="$(gh project item-list "$project_number" --owner "$REL_OWNER" --format json)"
+
+  repo_full="$REL_REPO_FULL"
+
+  echo "$json" | jq -r '
+    .items[]
+    | select((.status // "No status") | ascii_downcase == "done")
+    | [.id, (.content.number? // empty)]
+    | @tsv
+  ' | while IFS=$'\t' read -r item_id issue_no; do
+    [[ -z "$item_id" ]] && continue
+
+    # garante status Done (idempotente)
+    rel_try_set_status "$project_number" "$item_id" "Done"
+
+    # fecha issue real (liga o "completed" ✓)
+    if [[ -n "${issue_no:-}" ]]; then
+      gh issue close "$issue_no" --repo "$repo_full" >/dev/null || true
+    fi
+  done
+}
+
+rel_project_has_backlog() {
+  emulate -L zsh
+  set -u
+  set -o pipefail
+
+  local project_number="$1"
+  local json
+  json="$(gh project item-list "$project_number" --owner "$REL_OWNER" --format json)"
+
+  echo "$json" | jq -e '
+    any(.items[];
+      ((.status // "No status") | ascii_downcase) != "done"
+    )
+  ' >/dev/null
+}
+
+rel_move_backlog_to_project() {
+  emulate -L zsh
+  set -u
+  set -o pipefail
+
+  local from_proj="$1"   # projeto "vX.Y (released)" (era a dev line anterior)
+  local to_proj="$2"     # novo "vX.Y.x"
+
+  # IDs GraphQL (necessário para remover item do projeto antigo)
+  local from_project_id
+  from_project_id="$(
+    gh project view "$from_proj" --owner "$REL_OWNER" --format json | jq -r '.id'
+  )"
+
+  # Pega backlog: item_id + issue_url + status + issue_number
+  local json
+  json="$(gh project item-list "$from_proj" --owner "$REL_OWNER" --format json)"
+
+  echo "$json" | jq -r '
+    .items[]
+    | select(((.status // "No status") | ascii_downcase) != "done")
+    | [
+        .id,
+        (.content.url // ""),
+        (.status // "Todo"),
+        (.content.number? // empty)
+      ]
+    | @tsv
+  ' | while IFS=$'\t' read -r item_id url st issue_no; do
+    [[ -z "${item_id:-}" ]] && continue
+    [[ -z "${url:-}" ]] && continue
+
+    # 1) adiciona ao novo projeto
+    gh project item-add "$to_proj" --owner "$REL_OWNER" --url "$url" >/dev/null
+
+    # 2) acha o NOVO item_id no projeto destino pelo issue number e replica status
+    if [[ -n "${issue_no:-}" ]]; then
+      local to_json new_item_id
+      to_json="$(gh project item-list "$to_proj" --owner "$REL_OWNER" --format json)"
+      new_item_id="$(
+        echo "$to_json" | jq -r --argjson N "$issue_no" '
+          .items[]
+          | select(.content.number? == $N)
+          | .id
+        ' | head -n1
+      )"
+
+      if [[ -n "${new_item_id:-}" && "${new_item_id:-}" != "null" ]]; then
+        # st pode vir "Todo" ou "In Progress" — e precisa existir no projeto destino
+        rel_try_set_status "$to_proj" "$new_item_id" "$st"
+      fi
+    fi
+
+    # 3) remove do projeto antigo (pra não ficar pendência em "released")
+    gh api graphql -f query='
+      mutation($projectId:ID!, $itemId:ID!){
+        deleteProjectV2Item(input:{projectId:$projectId, itemId:$itemId}) {
+          deletedItemId
+        }
+      }' -F projectId="$from_project_id" -F itemId="$item_id" >/dev/null || true
+  done
+}
+
+rel_open_next_project_auto() {
+  emulate -L zsh
+  set -u
+  set -o pipefail
+
+  local next_title="$1"
+
+  local next_proj
+  next_proj="$(
+    gh project create --owner "$REL_OWNER" --title "$next_title" --format json |
+      jq -r '.number'
+  )"
+
+  rel_link_project_to_repo "$next_proj"
+
+  local vis
+  vis="$(rel_project_visibility_for_repo)"
+  gh project edit "$next_proj" --owner "$REL_OWNER" --visibility "$vis" >/dev/null
+
+  echo "$next_proj"
 }
