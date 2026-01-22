@@ -109,7 +109,7 @@ todo() {
         elif s($i) == "in progress" then
           "\u001b[33m" + istatus($i) + "\u001b[0m"     # amarelo
         elif s($i) == "todo" then
-          "\u001b[32m" + istatus($i) + "\u001b[0m"   # verde
+          "\u001b[32m" + "TODO" + "\u001b[0m"          # verde
         else
           istatus($i)
         end;

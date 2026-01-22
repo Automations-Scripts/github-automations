@@ -27,24 +27,73 @@ rel_project_visibility_for_repo() {
 
 rel_ctx_load_open_milestone() {
   emulate -L zsh
-  set -u
-  set -o pipefail
+  set -euo pipefail
+
+  rel_ctx_load_repo
 
   typeset -g REL_PROJ REL_PROJ_TITLE
 
+  local owner_type projects_json linked
+  owner_type="$(gh api "repos/$REL_REPO_FULL" -q '.owner.type')"  # User|Organization
+
+  # Lista Projects v2 do OWNER (org ou user), com repos linkados
+  if [[ "$owner_type" == "Organization" ]]; then
+    projects_json="$(
+      gh api graphql -f query='
+        query($login:String!) {
+          organization(login:$login) {
+            projectsV2(first: 100) {
+              nodes {
+                number
+                title
+                closed
+                repositories(first: 100) { nodes { nameWithOwner } }
+              }
+            }
+          }
+        }' -F login="$REL_OWNER" \
+      | jq -c '.data.organization.projectsV2.nodes'
+    )"
+  else
+    projects_json="$(
+      gh api graphql -f query='
+        query($login:String!) {
+          user(login:$login) {
+            projectsV2(first: 100) {
+              nodes {
+                number
+                title
+                closed
+                repositories(first: 100) { nodes { nameWithOwner } }
+              }
+            }
+          }
+        }' -F login="$REL_OWNER" \
+      | jq -c '.data.user.projectsV2.nodes'
+    )"
+  fi
+
+  # Mantém só projects linkados a ESTE repo (evita "fantasmas")
+  linked="$(
+    echo "$projects_json" | jq -c --arg REPO "$REL_REPO_FULL" '
+      map(
+        select((.repositories.nodes // []) | map(.nameWithOwner) | index($REPO))
+      )
+    '
+  )"
+
+  # Pega o dev-line aberto mais antigo: vX.Y.x (closed=false)
   REL_PROJ="$(
-    gh project list --owner "$REL_OWNER" --format json |
-      jq -r '
-        .projects
-        | map(select(.closed == false))
-        | map(select(.title | test("^v[0-9]+\\.[0-9]+\\.x$")))
-        | sort_by(.number)
-        | .[0].number // empty
-      '
+    echo "$linked" | jq -r '
+      map(select(.closed == false))
+      | map(select((.title // "") | test("^v[0-9]+\\.[0-9]+\\.x$")))
+      | sort_by(.number)
+      | .[0].number // empty
+    '
   )"
 
   if [[ -z "${REL_PROJ:-}" ]]; then
-    echo "No open Project (development line) with title vX.Y.x found for $REL_OWNER."
+    echo "No open Project (development line) with title vX.Y.x found for $REL_REPO_FULL."
     return 1
   fi
 
@@ -241,25 +290,12 @@ rel_maybe_open_next_project() {
 
 rel_link_project_to_repo() {
   emulate -L zsh
-  set -u
-  set -o pipefail
+  set -euo pipefail
 
   local project_number="$1"
+  local repo_full="${2:-$REL_REPO_FULL}"
 
-  local project_id repo_id
-  project_id="$(gh project view "$project_number" --owner "$REL_OWNER" --format json | jq -r '.id')"
-  repo_id="$(gh api graphql -f query='
-    query($owner:String!, $name:String!){
-      repository(owner:$owner, name:$name){ id }
-    }' -F owner="$REL_OWNER" -F name="$REL_REPO" -q '.data.repository.id')"
-
-  # Link repository to project (Projects v2)
-  gh api graphql -f query='
-    mutation($projectId:ID!, $repoId:ID!){
-      linkProjectV2ToRepository(input:{projectId:$projectId, repositoryId:$repoId}) {
-        clientMutationId
-      }
-    }' -F projectId="$project_id" -F repoId="$repo_id" >/dev/null
+  gh project link "$project_number" --owner "$REL_OWNER" --repo "$repo_full" >/dev/null
 }
 
 rel_create_tag() {
@@ -456,8 +492,7 @@ rel_move_backlog_to_project() {
 
 rel_open_next_project_auto() {
   emulate -L zsh
-  set -u
-  set -o pipefail
+  set -euo pipefail
 
   local next_title="$1"
 
@@ -467,11 +502,62 @@ rel_open_next_project_auto() {
       jq -r '.number'
   )"
 
-  rel_link_project_to_repo "$next_proj"
+  rel_link_project_to_repo "$next_proj" "$REL_REPO_FULL"
+
+  # valida (se falhar aqui, você pega na hora)
+  local repos
+  repos="$(gh project view "$next_proj" --owner "$REL_OWNER" --format json | jq -r '.repositories')"
+  if [[ "$repos" == "null" ]]; then
+    echo "[fatal] Project #$next_proj created but NOT linked to $REL_REPO_FULL"
+    return 1
+  fi
 
   local vis
   vis="$(rel_project_visibility_for_repo)"
   gh project edit "$next_proj" --owner "$REL_OWNER" --visibility "$vis" >/dev/null
 
   echo "$next_proj"
+}
+
+rel_projects_v2_json_for_owner() {
+  emulate -L zsh
+  set -euo pipefail
+
+  local owner="$1"
+  local repo_full="$2"
+
+  local owner_type
+  owner_type="$(gh api "repos/$repo_full" -q '.owner.type')" # User|Organization
+
+  if [[ "$owner_type" == "Organization" ]]; then
+    gh api graphql -f query='
+      query($login:String!) {
+        organization(login:$login) {
+          projectsV2(first: 100) {
+            nodes {
+              number
+              title
+              closed
+              repositories(first: 100) { nodes { nameWithOwner } }
+            }
+          }
+        }
+      }' -F login="$owner" \
+    | jq -c '.data.organization.projectsV2.nodes'
+  else
+    gh api graphql -f query='
+      query($login:String!) {
+        user(login:$login) {
+          projectsV2(first: 100) {
+            nodes {
+              number
+              title
+              closed
+              repositories(first: 100) { nodes { nameWithOwner } }
+            }
+          }
+        }
+      }' -F login="$owner" \
+    | jq -c '.data.user.projectsV2.nodes'
+  fi
 }
